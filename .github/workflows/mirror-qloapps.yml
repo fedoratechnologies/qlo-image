@@ -1,0 +1,44 @@
+name: Mirror QloApps image to GHCR
+
+on:
+  workflow_dispatch:        # manual trigger
+  schedule:
+    - cron: '0 4 * * *'     # optional: daily at 04:00 UTC
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write        # required to push to ghcr.io
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull QloApps from Docker Hub
+        run: docker pull webkul/qloapps_docker:latest
+
+      - name: Tag image for GHCR
+        run: |
+          GHCR_IMAGE=ghcr.io/${{ github.repository_owner }}/qloapps:latest
+          docker tag webkul/qloapps_docker:latest "$GHCR_IMAGE"
+          echo "GHCR_IMAGE=$GHCR_IMAGE" >> $GITHUB_ENV
+
+      - name: Push image to GHCR
+        run: docker push "$GHCR_IMAGE"
+
