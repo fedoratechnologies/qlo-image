@@ -2,8 +2,14 @@ name: Mirror QloApps image to GHCR
 
 on:
   workflow_dispatch:        # manual trigger
-  schedule:
-    - cron: '0 4 * * *'     # optional: daily at 04:00 UTC
+    inputs:
+      source_tag:
+        description: "QloApps Docker Hub tag to mirror (e.g. 1.6.1)"
+        required: false
+        default: "1.6.1"
+  # optional: keep if you want scheduled refresh of a specific tag
+  #schedule:
+  #  - cron: '0 4 * * *'
 
 jobs:
   mirror:
@@ -30,15 +36,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set image tag
+        id: vars
+        run: |
+          TAG="${{ github.event.inputs.source_tag }}"
+          if [ -z "$TAG" ]; then TAG="1.6.1"; fi
+          echo "QLO_TAG=$TAG" >> $GITHUB_ENV
+
       - name: Pull QloApps from Docker Hub
-        run: docker pull webkul/qloapps_docker:latest
+        run: docker pull webkul/qloapps_docker:${{ env.QLO_TAG }}
 
       - name: Tag image for GHCR
         run: |
-          GHCR_IMAGE=ghcr.io/${{ github.repository_owner }}/qloapps:latest
-          docker tag webkul/qloapps_docker:latest "$GHCR_IMAGE"
+          GHCR_IMAGE=ghcr.io/${{ github.repository_owner }}/qloapps:${{ env.QLO_TAG }}
+          docker tag webkul/qloapps_docker:${{ env.QLO_TAG }} "$GHCR_IMAGE"
           echo "GHCR_IMAGE=$GHCR_IMAGE" >> $GITHUB_ENV
 
       - name: Push image to GHCR
         run: docker push "$GHCR_IMAGE"
-
